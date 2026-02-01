@@ -21,7 +21,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -189,28 +189,68 @@
             background: #1a1a1a;
             border-top: 1px solid #2e2e2e;
             margin-left: 40px;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
         .instructions.visible {
             display: block;
         }
 
+        .instruction-header {
+            display: grid;
+            grid-template-columns: 60px 3fr 80px 100px;
+            gap: 10px;
+            padding: 10px 12px;
+            background: #252526;
+            font-weight: bold;
+            border-bottom: 2px solid #3e3e3e;
+            position: sticky;
+            top: 0;
+        }
+
         .instruction-row {
             display: grid;
-            grid-template-columns: 2fr 120px 120px 120px;
+            grid-template-columns: 60px 3fr 80px 100px;
             gap: 10px;
-            padding: 8px 12px;
+            padding: 6px 12px;
             border-bottom: 1px solid #2a2a2a;
             align-items: center;
             font-size: 12px;
+        }
+
+        .instruction-row:nth-child(even) {
+            background: #1e1e1e;
+        }
+
+        .instruction-row:hover {
+            background: #252526;
         }
 
         .instruction-row:last-child {
             border-bottom: none;
         }
 
-        .instruction-name {
+        .instruction-index {
+            color: #5c6370;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .instruction-text {
             color: #c678dd;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .instruction-addr {
+            color: #d19a66;
+            text-align: center;
+        }
+
+        .instruction-cycles {
+            color: #98c379;
+            text-align: right;
+            font-weight: bold;
         }
 
         .legend {
@@ -267,12 +307,12 @@
                     <div class="stat-value">0</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Total Time</div>
-                    <div class="stat-value">0.366ms</div>
+                    <div class="stat-label">Instructions</div>
+                    <div class="stat-value">0</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Clock</div>
-                    <div class="stat-value">1.0 MHz</div>
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value">0.366ms</div>
                 </div>
             </div>
         </div>
