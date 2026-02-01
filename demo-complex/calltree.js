@@ -7,10 +7,14 @@ function toggleNode(header) {
     const instructions = node.querySelector('.instructions');
     const btn = header.querySelector('.expand-btn');
 
-    if (children && children.children.length > 0) {
+    // Toggle children if they exist
+    if (children && children.children.length > 0 && !children.querySelector('.empty-message')) {
         children.classList.toggle('visible');
         btn.classList.toggle('expanded');
-    } else if (instructions) {
+    }
+
+    // Always toggle instructions if they exist
+    if (instructions && !instructions.querySelector('.empty-message')) {
         instructions.classList.toggle('visible');
         if (btn) {
             btn.classList.toggle('expanded');
