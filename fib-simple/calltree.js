@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (query === '' || name.includes(query)) {
                 node.style.display = 'block';
                 
-                // Expand matching nodes
                 const children = node.querySelector('.children');
                 if (children && children.children.length > 0) {
                     children.classList.add('visible');
