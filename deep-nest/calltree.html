@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6502 Call Tree Profiler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            background: #1e1e1e;
+            color: #d4d4d4d;
+            line-height: 1.5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #61afef;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: #3e3e3e;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #4e4e4e;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #61afef;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            background: #2d2d2d;
+            border: 1px solid #3e3e3e;
+            border-radius: 4px;
+            color: #d4d4d4d;
+            font-family: inherit;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #61afef;
+        }
+
+        .tree {
+            background: #252526;
+            border-radius: 8px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .node {
+            border-bottom: 1px solid #2e2e2e;
+        }
+
+        .node:last-child {
+            border-bottom: none;
+        }
+
+        .node-header {
+            display: grid;
+            grid-template-columns: 40px 2fr 120px 120px 120px 80px;
+            gap: 10px;
+            padding: 12px;
+            background: #2c2c2d;
+            cursor: pointer;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .node-header:hover {
+            background: #363637;
+        }
+
+        .node-header.selected {
+            background: #3e3e3e;
+        }
+
+        .expand-btn {
+            width: 24px;
+            height: 24px;
+            background: #3e3e3e;
+            border: none;
+            border-radius: 4px;
+            color: #61afef;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .expand-btn:hover {
+            background: #4e4e4e;
+        }
+
+        .expand-btn.expanded {
+            transform: rotate(90deg);
+        }
+
+        .node-name {
+            color: #e5c07b;
+            font-weight: bold;
+            padding-left: 0px;
+        }
+
+        .node-name.level-1 { padding-left: 0px; }
+        .node-name.level-2 { padding-left: 20px; }
+        .node-name.level-3 { padding-left: 40px; }
+        .node-name.level-4 { padding-left: 60px; }
+        .node-name.level-5 { padding-left: 80px; }
+        .node-name.level-6 { padding-left: 100px; }
+        .node-name.level-7 { padding-left: 120px; }
+        .node-name.level-8 { padding-left: 140px; }
+
+        .stat {
+            text-align: right;
+            font-size: 12px;
+        }
+
+        .stat.primary {
+            color: #98c379;
+            font-weight: bold;
+        }
+
+        .stat.secondary {
+            color: #e06c75;
+        }
+
+        .stat.tertiary {
+            color: #d19a66;
+        }
+
+        .stat.quaternary {
+            color: #61afef;
+        }
+
+        .children {
+            display: none;
+            background: #1e1e1e;
+        }
+
+        .children.visible {
+            display: block;
+        }
+
+        .instructions {
+            display: none;
+            background: #1a1a1a;
+            border-top: 1px solid #2e2e2e;
+            margin-left: 40px;
+        }
+
+        .instructions.visible {
+            display: block;
+        }
+
+        .instruction-row {
+            display: grid;
+            grid-template-columns: 2fr 120px 120px 120px;
+            gap: 10px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a2a;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .instruction-row:last-child {
+            border-bottom: none;
+        }
+
+        .instruction-name {
+            color: #c678dd;
+        }
+
+        .legend {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .legend h3 {
+            color: #61afef;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .empty-message {
+            padding: 40px;
+            text-align: center;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>6502 Call Tree Profiler</h1>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-label">Total Cycles</div>
+                    <div class="stat-value">28,105</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Functions</div>
+                    <div class="stat-value">81</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Max Depth</div>
+                    <div class="stat-value">10</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value">28.105ms</div>
+                </div>
+            </div>
+        </div>
+
+        <input type="text" class="search-box" placeholder="Search functions... (type to filter)" id="searchBox">
+
+        <div class="tree" id="tree">
+            
+                <div class="node" data-name="init_test_data">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">init_test_data</div>
+                        <div class="stat primary">486</div>
+                        <div class="stat secondary">1.7%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">process_level1</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">4,889</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="level2_setup">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">level2_setup</div>
+                        <div class="stat primary">199</div>
+                        <div class="stat secondary">0.7%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">process_level2</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">4,435</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="level3_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-3">level3_work</div>
+                        <div class="stat primary">105</div>
+                        <div class="stat secondary">0.4%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level3">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">process_level3</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">4,155</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="process_level4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">process_level4</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">1,361</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="inner_loop_4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-5">inner_loop_4</div>
+                        <div class="stat primary">935</div>
+                        <div class="stat secondary">3.3%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">18</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.06%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">process_level4</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">1,361</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="inner_loop_4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-5">inner_loop_4</div>
+                        <div class="stat primary">935</div>
+                        <div class="stat secondary">3.3%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">18</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.06%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">process_level4</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">1,361</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="inner_loop_4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-5">inner_loop_4</div>
+                        <div class="stat primary">935</div>
+                        <div class="stat secondary">3.3%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="process_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">process_level5</div>
+                        <div class="stat primary">24</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">189</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="bottom_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">bottom_worker</div>
+                        <div class="stat primary">63</div>
+                        <div class="stat secondary">0.2%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">36</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.13%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">18</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.06%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="more_level3_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-3">more_level3_work</div>
+                        <div class="stat primary">151</div>
+                        <div class="stat secondary">0.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="level2_cleanup">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">level2_cleanup</div>
+                        <div class="stat primary">231</div>
+                        <div class="stat secondary">0.8%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="shallow_processor">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">shallow_processor</div>
+                        <div class="stat primary">30</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">2,756</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="compute_checksum">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">compute_checksum</div>
+                        <div class="stat primary">689</div>
+                        <div class="stat secondary">2.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDA</div>
+                    <div class="stat primary">8</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.03%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="compute_checksum">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">compute_checksum</div>
+                        <div class="stat primary">689</div>
+                        <div class="stat secondary">2.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDA</div>
+                    <div class="stat primary">8</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.03%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="compute_checksum">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">compute_checksum</div>
+                        <div class="stat primary">689</div>
+                        <div class="stat secondary">2.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDA</div>
+                    <div class="stat primary">8</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.03%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="compute_checksum">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">compute_checksum</div>
+                        <div class="stat primary">689</div>
+                        <div class="stat secondary">2.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDA</div>
+                    <div class="stat primary">8</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.03%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="deep_processor">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">deep_processor</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">134</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">dp_level1</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">122</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">dp_level2</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">110</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level3">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">dp_level3</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">98</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level4">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">dp_level4</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">86</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level5">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-6">dp_level5</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">74</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level6">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-7">dp_level6</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">62</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level7">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-8">dp_level7</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">50</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_level8">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-9">dp_level8</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">38</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="dp_do_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-10">dp_do_work</div>
+                        <div class="stat primary">38</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="heavy_bottom">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">heavy_bottom</div>
+                        <div class="stat primary">30</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">8,324</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_setup">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">hb_setup</div>
+                        <div class="stat primary">455</div>
+                        <div class="stat secondary">1.6%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="hb_deep_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">hb_deep_worker</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,695</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">hb_level1</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,683</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">hb_level2</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,671</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level3">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">hb_level3</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,659</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_heavy_loop">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">hb_heavy_loop</div>
+                        <div class="stat primary">3,659</div>
+                        <div class="stat secondary">13.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="hb_deep_worker">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">hb_deep_worker</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,695</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">hb_level1</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,683</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">hb_level2</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,671</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_level3">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-5">hb_level3</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">3,659</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="hb_heavy_loop">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-6">hb_heavy_loop</div>
+                        <div class="stat primary">3,659</div>
+                        <div class="stat secondary">13.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">12</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.04%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="hb_cleanup">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">hb_cleanup</div>
+                        <div class="stat primary">455</div>
+                        <div class="stat secondary">1.6%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="heavy_top">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">heavy_top</div>
+                        <div class="stat primary">36</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">11,079</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_heavy_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">ht_heavy_work</div>
+                        <div class="stat primary">3,655</div>
+                        <div class="stat secondary">13.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="ht_light_call_1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">ht_light_call_1</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">45</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep1">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">ht_deep1</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">33</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep1a">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">ht_deep1a</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">21</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep1b">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-5">ht_deep1b</div>
+                        <div class="stat primary">21</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="ht_heavy_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">ht_heavy_work</div>
+                        <div class="stat primary">3,655</div>
+                        <div class="stat secondary">13.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="ht_light_call_2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-2">ht_light_call_2</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">45</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep2">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-3">ht_deep2</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">33</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep2a">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-4">ht_deep2a</div>
+                        <div class="stat primary">12</div>
+                        <div class="stat secondary">0.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">21</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="ht_deep2b">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-5">ht_deep2b</div>
+                        <div class="stat primary">21</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="ht_heavy_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">ht_heavy_work</div>
+                        <div class="stat primary">3,655</div>
+                        <div class="stat secondary">13.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDY</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">JSR</div>
+                    <div class="stat primary">6</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.02%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="branching_demo">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" >▶</button>
+                        <div class="node-name level-1">branching_demo</div>
+                        <div class="stat primary">23</div>
+                        <div class="stat secondary">0.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">238</div>
+                    </div>
+                    <div class="children">
+                        
+                <div class="node" data-name="path1_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">path1_work</div>
+                        <div class="stat primary">119</div>
+                        <div class="stat secondary">0.4%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="path1_work">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-2">path1_work</div>
+                        <div class="stat primary">119</div>
+                        <div class="stat secondary">0.4%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">CMP</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.01%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+        </div>
+
+        <div class="legend">
+            <h3>Legend</h3>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #98c379"></div>
+                    <span>Cycles (total)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e06c75"></div>
+                    <span>% of total</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #d19a66"></div>
+                    <span>% of parent</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #61afef"></div>
+                    <span>Call count</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="profiler.js"></script>
+</body>
+</html>

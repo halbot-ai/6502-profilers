@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6502 Call Tree Profiler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            background: #1e1e1e;
+            color: #d4d4d4d;
+            line-height: 1.5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #61afef;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: #3e3e3e;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #4e4e4e;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #61afef;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            background: #2d2d2d;
+            border: 1px solid #3e3e3e;
+            border-radius: 4px;
+            color: #d4d4d4d;
+            font-family: inherit;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #61afef;
+        }
+
+        .tree {
+            background: #252526;
+            border-radius: 8px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .node {
+            border-bottom: 1px solid #2e2e2e;
+        }
+
+        .node:last-child {
+            border-bottom: none;
+        }
+
+        .node-header {
+            display: grid;
+            grid-template-columns: 40px 2fr 120px 120px 120px 80px;
+            gap: 10px;
+            padding: 12px;
+            background: #2c2c2d;
+            cursor: pointer;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .node-header:hover {
+            background: #363637;
+        }
+
+        .node-header.selected {
+            background: #3e3e3e;
+        }
+
+        .expand-btn {
+            width: 24px;
+            height: 24px;
+            background: #3e3e3e;
+            border: none;
+            border-radius: 4px;
+            color: #61afef;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .expand-btn:hover {
+            background: #4e4e4e;
+        }
+
+        .expand-btn.expanded {
+            transform: rotate(90deg);
+        }
+
+        .node-name {
+            color: #e5c07b;
+            font-weight: bold;
+            padding-left: 0px;
+        }
+
+        .node-name.level-1 { padding-left: 0px; }
+        .node-name.level-2 { padding-left: 20px; }
+        .node-name.level-3 { padding-left: 40px; }
+        .node-name.level-4 { padding-left: 60px; }
+        .node-name.level-5 { padding-left: 80px; }
+        .node-name.level-6 { padding-left: 100px; }
+        .node-name.level-7 { padding-left: 120px; }
+        .node-name.level-8 { padding-left: 140px; }
+
+        .stat {
+            text-align: right;
+            font-size: 12px;
+        }
+
+        .stat.primary {
+            color: #98c379;
+            font-weight: bold;
+        }
+
+        .stat.secondary {
+            color: #e06c75;
+        }
+
+        .stat.tertiary {
+            color: #d19a66;
+        }
+
+        .stat.quaternary {
+            color: #61afef;
+        }
+
+        .children {
+            display: none;
+            background: #1e1e1e;
+        }
+
+        .children.visible {
+            display: block;
+        }
+
+        .instructions {
+            display: none;
+            background: #1a1a1a;
+            border-top: 1px solid #2e2e2e;
+            margin-left: 40px;
+        }
+
+        .instructions.visible {
+            display: block;
+        }
+
+        .instruction-row {
+            display: grid;
+            grid-template-columns: 2fr 120px 120px 120px;
+            gap: 10px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a2a;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .instruction-row:last-child {
+            border-bottom: none;
+        }
+
+        .instruction-name {
+            color: #c678dd;
+        }
+
+        .legend {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #3e3e3e;
+        }
+
+        .legend h3 {
+            color: #61afef;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .empty-message {
+            padding: 40px;
+            text-align: center;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>6502 Call Tree Profiler</h1>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-label">Total Cycles</div>
+                    <div class="stat-value">1,743</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Functions</div>
+                    <div class="stat-value">7</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Max Depth</div>
+                    <div class="stat-value">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value">1.743ms</div>
+                </div>
+            </div>
+        </div>
+
+        <input type="text" class="search-box" placeholder="Search functions... (type to filter)" id="searchBox">
+
+        <div class="tree" id="tree">
+            
+                <div class="node" data-name="init_sorted_array">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">init_sorted_array</div>
+                        <div class="stat primary">231</div>
+                        <div class="stat secondary">13.3%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.11%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="binary_search">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">binary_search</div>
+                        <div class="stat primary">67</div>
+                        <div class="stat secondary">3.8%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">STA</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.23%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="reverse_string">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">reverse_string</div>
+                        <div class="stat primary">375</div>
+                        <div class="stat secondary">21.5%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.11%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="count_bits">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">count_bits</div>
+                        <div class="stat primary">158</div>
+                        <div class="stat secondary">9.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">STA</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.23%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="multiply_by_10">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">multiply_by_10</div>
+                        <div class="stat primary">32</div>
+                        <div class="stat secondary">1.8%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">STA</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.23%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="find_min_max">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">find_min_max</div>
+                        <div class="stat primary">453</div>
+                        <div class="stat secondary">26.0%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDA</div>
+                    <div class="stat primary">4</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.23%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+                <div class="node" data-name="xor_encrypt">
+                    <div class="node-header" onclick="toggleNode(this)">
+                        <button class="expand-btn" style="visibility: hidden">▶</button>
+                        <div class="node-name level-1">xor_encrypt</div>
+                        <div class="stat primary">367</div>
+                        <div class="stat secondary">21.1%</div>
+                        <div class="stat tertiary">1×</div>
+                        <div class="stat quaternary">0</div>
+                    </div>
+                    <div class="children">
+                        <div class="empty-message">No function calls detected</div>
+                    </div>
+                    <div class="instructions">
+                        
+            <div class="instruction-row" style="background: #252526; font-weight: bold; border-bottom: 2px solid #3e3e3e;">
+                <div>Instruction</div>
+                <div class="stat primary">Cycles</div>
+                <div class="stat secondary">% of Function</div>
+                <div class="stat tertiary">% of Total</div>
+            </div>
+            
+                <div class="instruction-row">
+                    <div class="instruction-name">LDX</div>
+                    <div class="stat primary">2</div>
+                    <div class="stat secondary">100.0%</div>
+                    <div class="stat tertiary">0.11%</div>
+                </div>
+            
+        
+                    </div>
+                </div>
+            
+        </div>
+
+        <div class="legend">
+            <h3>Legend</h3>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #98c379"></div>
+                    <span>Cycles (total)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e06c75"></div>
+                    <span>% of total</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #d19a66"></div>
+                    <span>% of parent</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #61afef"></div>
+                    <span>Call count</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="profiler.js"></script>
+</body>
+</html>

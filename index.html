@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6502 Profilers Gallery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .card h2 {
+            font-size: 24px;
+            color: #764ba2;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .card .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .link:hover {
+            transform: scale(1.02);
+        }
+
+        .link svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 28px;
+            }
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 6502 Profilers Gallery</h1>
+            <p>Interactive profiling tools for Commodore 64 assembly code</p>
+        </div>
+
+        <div class="grid">
+            <!-- Algorithms -->
+            <div class="card">
+                <h2>algorithms <span class="badge">SIMPLE</span></h2>
+                <div class="description">
+                    Multiple algorithms: binary search, string reversal, bit counting, multiplication by 10, min/max finding, XOR encryption.
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Time:</span>
+                        1.68ms
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Functions:</span>
+                        11
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Max Depth:</span>
+                        2
+                    </div>
+                </div>
+                <div class="links">
+                    <a href="algorithms/calltree.html" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 1.99-.9 1.99-1.99V10c0 1.1-.9 2-2 2H5v8h6V6c0-1.1.9-2 2-2s2-.9 2-2-2V5c0-1.1-.9-2-2-2s-2 .9-2 2v13c0 1.1.9 2 2 2s2-.9 2-2 2V7c0 1.1.9 2 2 2s2 .9 2 2 2v6h-2z"/>
+                        </svg>
+                        Call Tree
+                    </a>
+                    <a href="algorithms/algorithms-flamegraph.svg" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M13.5.67 11.03C14.22 10.39 15 10 16 10c1.66 0 3 .39 4.33 1.03L17 9l-2-2c-.39-.39-1.03-.39-1.42 0L12 9.58 9.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59c-.39-.39-1.03-.39-1.42 0L6 9.58 5.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59C6.39 10.39 7 10 8 10c1.66 0 3 .39 4.33 1.03L11 9l-2-2c-.39-.39-1.03-.39-1.42 0L7.5 9.58 6.42 10.42z"/>
+                        </svg>
+                        Flame Graph
+                    </a>
+                </div>
+            </div>
+
+            <!-- Deep Nest -->
+            <div class="card">
+                <h2>deep-nest <span class="badge">COMPLEX</span></h2>
+                <div class="description">
+                    Deeply nested complex example with 5+ levels of subroutine nesting, heavy work at different stack depths, nested loops, multiple branching paths.
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Time:</span>
+                        28.06ms
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Functions:</span>
+                        53
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Max Depth:</span>
+                        8
+                    </div>
+                </div>
+                <div class="links">
+                    <a href="deep-nest/calltree.html" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 1.99-.9 1.99-1.99V10c0 1.1-.9 2-2 2H5v8h6V6c0-1.1.9-2 2-2s2-.9 2-2-2V5c0-1.1-.9-2-2-2s-2 .9-2 2v13c0 1.1.9 2 2 2s2-.9 2-2 2V7c0 1.1.9 2 2 2s2 .9 2 2 2v6h-2z"/>
+                        </svg>
+                        Call Tree
+                    </a>
+                    <a href="deep-nest/deep-nest-flamegraph.svg" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M13.5.67 11.03C14.22 10.39 15 10 16 10c1.66 0 3 .39 4.33 1.03L17 9l-2-2c-.39-.39-1.03-.39-1.42 0L12 9.58 9.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59c-.39-.39-1.03-.39-1.42 0L6 9.58 5.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59C6.39 10.39 7 10 8 10c1.66 0 3 .39 4.33 1.03L11 9l-2-2c-.39-.39-1.03-.39-1.42 0L7.5 9.58 6.42 10.42z"/>
+                        </svg>
+                        Flame Graph
+                    </a>
+                </div>
+            </div>
+
+            <!-- Demo Complex -->
+            <div class="card">
+                <h2>demo-complex</h2>
+                <div class="description">
+                    Bubble sort, data transformation, pattern generation, checksum calculation. Demonstrates typical sorting algorithms and data manipulation patterns.
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Time:</span>
+                        3.21ms
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Functions:</span>
+                        8
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Max Depth:</span>
+                        2
+                    </div>
+                </div>
+                <div class="links">
+                    <a href="demo-complex/calltree.html" class="link" style="opacity: 0.5; cursor: not-allowed;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 1.99-.9 1.99-1.99V10c0 1.1-.9 2-2 2H5v8h6V6c0-1.1.9-2 2-2s2-.9 2-2-2V5c0-1.1-.9-2-2-2s-2 .9-2 2v13c0 1.1.9 2 2 2s2-.9 2-2 2V7c0 1.1.9 2 2 2s2 .9 2 2 2v6h-2z"/>
+                        </svg>
+                        Call Tree (N/A)
+                    </a>
+                    <a href="demo-complex/demo-complex-flamegraph.svg" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M13.5.67 11.03C14.22 10.39 15 10 16 10c1.66 0 3 .39 4.33 1.03L17 9l-2-2c-.39-.39-1.03-.39-1.42 0L12 9.58 9.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59c-.39-.39-1.03-.39-1.42 0L6 9.58 5.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59C6.39 10.39 7 10 8 10c1.66 0 3 .39 4.33 1.03L11 9l-2-2c-.39-.39-1.03-.39-1.42 0L7.5 9.58 6.42 10.42z"/>
+                        </svg>
+                        Flame Graph
+                    </a>
+                </div>
+            </div>
+
+            <!-- Fib Simple -->
+            <div class="card">
+                <h2>fib-simple <span class="badge">BASIC</span></h2>
+                <div class="description">
+                    Simple Fibonacci calculator generating first 10 numbers of the sequence. Linear execution with single loop - good baseline for comparison.
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Time:</span>
+                        0.35ms
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Functions:</span>
+                        1
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Max Depth:</span>
+                        1
+                    </div>
+                </div>
+                <div class="links">
+                    <a href="fib-simple/calltree.html" class="link" style="opacity: 0.5; cursor: not-allowed;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 1.99-.9 1.99-1.99V10c0 1.1-.9 2-2 2H5v8h6V6c0-1.1.9-2 2-2s2-.9 2-2-2V5c0-1.1-.9-2-2-2s-2 .9-2 2v13c0 1.1.9 2 2 2s2-.9 2-2 2V7c0 1.1.9 2 2 2s2 .9 2 2 2v6h-2z"/>
+                        </svg>
+                        Call Tree (N/A)
+                    </a>
+                    <a href="fib-simple/fib-simple-flamegraph.svg" class="link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M13.5.67 11.03C14.22 10.39 15 10 16 10c1.66 0 3 .39 4.33 1.03L17 9l-2-2c-.39-.39-1.03-.39-1.42 0L12 9.58 9.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59c-.39-.39-1.03-.39-1.42 0L6 9.58 5.42 10.42c-.39.39-.39 1.03 0 1.42l-2 2 2-2c-.39-.39-.39-1.03 0-1.42l.58-1.59C6.39 10.39 7 10 8 10c1.66 0 3 .39 4.33 1.03L11 9l-2-2c-.39-.39-1.03-.39-1.42 0L7.5 9.58 6.42 10.42z"/>
+                        </svg>
+                        Flame Graph
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Built with <strong>HAL</strong> AI • 6502 Assembly Profiling Tools</p>
+            <p>
+                <a href="https://github.com/halbot-ai/6502-profilers">GitHub Repository</a> •
+                <a href="https://openclaw.ai">OpenClaw</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
